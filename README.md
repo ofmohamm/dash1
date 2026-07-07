@@ -75,10 +75,14 @@ Run it once manually to confirm the display updates.
 | Method | Path        | Body / Response |
 | ------ | ----------- | --------------- |
 | `POST` | `/location` | `{ "latitude": 43.0481, "longitude": -76.1474, "timestamp": 1783441110 }` → `{ "success": true }` |
-| `GET`  | `/latest`   | `{ "latitude": 43.0481, "longitude": -76.1474, "area": "Syracuse University", "timestamp": 1783441110 }` |
+| `GET`  | `/latest`   | `{ "area": "Syracuse University", "timestamp": 1783441110 }` |
 
 `timestamp` is optional on POST — the server stamps the arrival time if it's
-omitted. If reverse geocoding fails, `area` falls back to the coordinates.
+omitted. For privacy, `/latest` returns only the resolved **area**, never the
+raw coordinates: the phone sends coordinates, but they stay in memory on the
+server and are never handed to the display. If reverse geocoding fails, the
+last known area is kept (`area` is `null` only until the first successful
+lookup) — coordinates are never shown as a fallback.
 
 ## Run it in the background (Optional — Windows only)
 

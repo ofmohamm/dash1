@@ -96,11 +96,13 @@ def reverse_geocode(latitude: float, longitude: float) -> str | None:
     return data.get("display_name") or None
 
 
-def area_for(latitude: float, longitude: float) -> str:
+def area_for(latitude: float, longitude: float) -> str | None:
     """Area name for coordinates, reusing the cache for tiny movements.
 
-    Falls back to formatted coordinates when geocoding fails, so the display
-    always has something to show (spec: display coordinates instead of area).
+    Returns None if geocoding fails. We deliberately never fall back to raw
+    coordinates — the display shows a human-readable area only, never a precise
+    position — so the client just keeps showing the last known area (or a
+    "finding area" note) until the next lookup succeeds.
     """
     cache = _geocode_cache
     if (
@@ -113,9 +115,8 @@ def area_for(latitude: float, longitude: float) -> str:
 
     area = reverse_geocode(latitude, longitude)
     if area is None:
-        # Don't cache a failure — a transient Nominatim hiccup shouldn't pin us
-        # to coordinates once the next poll succeeds.
-        return f"{latitude:.4f}, {longitude:.4f}"
+        # Don't cache a failure — a transient Nominatim hiccup shouldn't stick.
+        return None
 
     _geocode_cache.update(latitude=latitude, longitude=longitude, area=area)
     return area
@@ -147,6 +148,12 @@ def update_location(body: dict) -> dict:
     area = area_for(latitude, longitude)
 
     with state_lock:
+        # If this fix couldn't be resolved to an area, keep the last known one
+        # rather than blanking the display — POSTs are infrequent (iOS can't
+        # run the Shortcut continuously), so the old area is the best guess
+        # until the next successful lookup.
+        if area is None:
+            area = state.get("area")
         state.update(
             latitude=latitude,
             longitude=longitude,
@@ -162,8 +169,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urllib.parse.urlparse(self.path).path
         if path == "/latest":
+            # Expose only the resolved area (and when it was updated) — never
+            # the raw coordinates. The display names an area, nothing precise.
             with state_lock:
-                self.send_json(dict(state))
+                self.send_json(
+                    {"area": state["area"], "timestamp": state["timestamp"]}
+                )
             return
         if path in {"/", "/index.html"}:
             self.serve_file(ROOT / "index.html", "text/html; charset=utf-8")

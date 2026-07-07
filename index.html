@@ -79,18 +79,6 @@
       letter-spacing: -0.03em;
     }
 
-    .coords {
-      margin-top: clamp(0.8rem, 1.6vw, 1.3rem);
-      color: var(--muted);
-      font-size: clamp(0.95rem, 1.7vw, 1.35rem);
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.01em;
-      min-height: 1em;
-    }
-
-    .coords:empty { display: none; }
-
     .updated {
       margin-top: clamp(1.4rem, 3vw, 2.6rem);
       color: var(--muted);
@@ -149,7 +137,6 @@
         Current Area
       </div>
       <div class="area waiting" id="area">Waiting for location…</div>
-      <div class="coords" id="coords"></div>
       <div class="updated" id="updated"></div>
     </section>
   </main>
@@ -168,7 +155,6 @@
   <script>
     const els = {
       area: document.getElementById("area"),
-      coords: document.getElementById("coords"),
       updated: document.getElementById("updated"),
       fullscreenBtn: document.getElementById("fullscreenBtn"),
       expandIcon: document.getElementById("expandIcon"),
@@ -202,9 +188,11 @@
       return `Updated ${hrs} hour${hrs === 1 ? "" : "s"} ago`;
     }
 
-    // Cache the latest good fix so the "updated N seconds ago" line keeps
-    // ticking between polls without waiting on the network.
-    const latest = { area: null, latitude: null, longitude: null, timestamp: null };
+    // Cache the latest fix so the "updated N seconds ago" line keeps ticking
+    // between polls. We track whether a fix has arrived (received) separately
+    // from whether it resolved to an area, so we never fall back to showing
+    // raw coordinates — the display only ever names an area.
+    const latest = { area: null, received: false, timestamp: null };
 
     function renderUpdated() {
       if (latest.timestamp == null) {
@@ -220,20 +208,15 @@
     }
 
     function render() {
-      if (latest.area == null) {
+      if (latest.area) {
+        swapArea(latest.area, false);
+      } else if (latest.received) {
+        // A fix arrived but hasn't resolved to an area yet (geocoding pending
+        // or briefly unavailable). Never reveal coordinates as a stand-in.
+        swapArea("Finding area…", true);
+      } else {
         swapArea("Waiting for location…", true);
-        els.coords.textContent = "";
-        renderUpdated();
-        return;
       }
-      swapArea(latest.area, false);
-      // Show coordinates as a subline under the named area — but not when
-      // geocoding fell back to coordinates, or the numbers would appear twice.
-      const coords =
-        latest.latitude != null && latest.longitude != null
-          ? `${latest.latitude.toFixed(4)}, ${latest.longitude.toFixed(4)}`
-          : "";
-      els.coords.textContent = coords && coords !== latest.area ? coords : "";
       renderUpdated();
     }
 
@@ -242,9 +225,8 @@
         const res = await fetch("/latest", { cache: "no-store" });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        latest.area = data.area;
-        latest.latitude = typeof data.latitude === "number" ? data.latitude : null;
-        latest.longitude = typeof data.longitude === "number" ? data.longitude : null;
+        latest.area = data.area || null;
+        latest.received = typeof data.timestamp === "number";
         latest.timestamp = typeof data.timestamp === "number" ? data.timestamp : null;
         render();
       } catch {
