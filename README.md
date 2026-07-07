@@ -194,8 +194,15 @@ Trigger the shortcut automatically when something happens:
 3. Set the action to **Run Shortcut** and choose **Send My Location**.
 4. Turn **off** "Ask Before Running" so it runs quietly.
 
-These do not fire every minute, but between arrive/leave and app-open triggers
-the display usually stays current enough for "where are they right now."
+**A simple, reliable pick: Driving Focus.** Choose **Focus -> Driving -> Is
+Turned On**. It runs in the background (phone locked, app closed) and iOS can
+turn Driving on for you when you start driving or connect to the car. Note it
+fires once, at the moment Driving turns on, so the display shows where the drive
+started, not each mile along the way. Add a second automation for **Is Turned
+Off** to also post your destination when you park.
+
+These do not fire every minute, but between arrive/leave, Focus, and app-open
+triggers the display usually stays current enough for "where are they right now."
 
 ### Option 2: A foreground loop (genuinely continuous, phone dedicated)
 
