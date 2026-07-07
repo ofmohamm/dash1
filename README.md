@@ -1,4 +1,4 @@
-# Dash v1
+# Dash 1
 
 A privacy-first desktop dashboard for a secondary display. Showcases time, weather, and upcoming Outlook calendar events from a local web server.
 
