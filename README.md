@@ -73,9 +73,42 @@ in the browser, with automatic HTTPS.
 > **Good to know:** the free plan puts the server to sleep after about 15
 > minutes of no traffic and forgets the last location. When that happens the
 > display shows "Waiting for location..." for around 30 seconds until your next
-> phone update wakes it back up. For a personal display this is usually fine.
-> (Railway and Fly.io are similar free options if you prefer; any host that runs
-> a Python web process and sets the `PORT` environment variable works.)
+> phone update wakes it back up. For a personal display this is usually fine,
+> and the next section shows how to avoid it. (Railway and Fly.io are similar
+> free options if you prefer; any host that runs a Python web process and sets
+> the `PORT` environment variable works.)
+
+### Keeping it awake (optional)
+
+You mostly do not need to do anything here. **While the display tab is open, it
+already keeps the server awake:** the page requests `/latest` every second, and
+that steady traffic resets the host's idle timer. The sleep only happens when
+nothing is hitting the server, such as overnight or before you open the display.
+
+If you want it to stay warm even when the display is closed (so there is no
+30-second wake-up when you walk up to the monitor), point a free uptime pinger
+at the server's health check:
+
+1. Sign up for a free pinger such as [cron-job.org](https://cron-job.org) or
+   [UptimeRobot](https://uptimerobot.com).
+2. Create a monitor that requests this URL every 5 to 10 minutes:
+
+   ```text
+   https://your-service.onrender.com/healthz
+   ```
+
+   `/healthz` is a tiny endpoint that needs no token and returns `{"ok": true}`,
+   so it is cheap to hit and safe to leave public.
+
+**One tradeoff to know:** Render's free tier gives about 750 running hours per
+month for your account. Keeping one service awake 24/7 uses roughly 730 of them,
+which fits but leaves little room for other free services. If you only use the
+display during the day, set the pinger to run only during those hours (for
+example 7am to midnight) to use about half that.
+
+> Do not try to keep it awake by having the server ping itself. Once it has gone
+> to sleep it cannot ping anything, and a host generally does not count a
+> service's traffic to itself. Use an outside pinger.
 
 ### A3. Build the iPhone Shortcut
 

@@ -207,6 +207,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        # Lightweight, no-auth keep-alive target. A free uptime pinger (or the
+        # host's own health check) can hit this cheaply to stop a free-tier web
+        # host from sleeping. It reveals nothing and touches no location data.
+        if path == "/healthz":
+            self.send_json({"ok": True})
+            return
         if path == "/latest":
             if not authorized(self.headers, parsed.query):
                 self.send_json(
