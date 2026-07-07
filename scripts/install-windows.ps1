@@ -1,5 +1,5 @@
 <#
-  Installs the Calendar Dashboard as a background Scheduled Task on Windows.
+  Installs the Location Display server as a background Scheduled Task on Windows.
 
   - Runs server.py with pythonw.exe (no console window)
   - Starts automatically at every log on
@@ -12,7 +12,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$TaskName = "CalendarDashboard"
+$TaskName = "LocationDisplay"
 $RepoRoot = Split-Path $PSScriptRoot -Parent
 $ServerPy = Join-Path $RepoRoot "server.py"
 
@@ -58,13 +58,13 @@ $settings = New-ScheduledTaskSettingsSet `
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Principal $principal -Settings $settings -Force `
-    -Description "Runs the Calendar Dashboard in the background." | Out-Null
+    -Description "Runs the Location Display server in the background." | Out-Null
 
 Start-ScheduledTask -TaskName $TaskName
 
 Write-Host ""
-Write-Host "Installed and started. The dashboard now runs in the background and"
+Write-Host "Installed and started. The server now runs in the background and"
 Write-Host "starts automatically when you log in."
-Write-Host "Open it at:  http://127.0.0.1:5173/"
+Write-Host "Open the display at:  http://127.0.0.1:3000/"
 Write-Host ""
 Write-Host "To remove it later:  powershell -ExecutionPolicy Bypass -File scripts\uninstall-windows.ps1"

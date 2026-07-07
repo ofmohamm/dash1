@@ -1,12 +1,12 @@
 <#
-  Removes the Calendar Dashboard background Scheduled Task.
+  Removes the Location Display background Scheduled Task.
 
   Run from this repo:
     powershell -ExecutionPolicy Bypass -File scripts\uninstall-windows.ps1
 #>
 
 $ErrorActionPreference = "Stop"
-$TaskName = "CalendarDashboard"
+$TaskName = "LocationDisplay"
 
 $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 if (-not $task) {

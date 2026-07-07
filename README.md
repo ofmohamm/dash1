@@ -1,41 +1,88 @@
-# Dash 1
+# iPhone Live Location Display
 
-A privacy-first desktop dashboard for a secondary display. Showcases time, weather, and upcoming Outlook calendar events from a local web server.
+A minimal, self-hosted display that shows your current area — read from your
+iPhone's GPS — in large type on a spare monitor. Your phone sends its location
+with a native **Shortcut**; a tiny local server reverse-geocodes it and a
+fullscreen page shows where you are.
 
-### Features
+No database. No accounts. No cloud. Runs entirely on your local network.
 
-- **Agenda** : today's upcoming events, rolling into the next days.
-- **Click to join** : events with a Teams/Zoom/Meet link open directly from dashboard.
+<img width="2724" height="1563" alt="location display" src="https://github.com/user-attachments/assets/3cd4ac98-7993-411a-8c05-2fd212a97dfd" />
 
-<img width="2724" height="1563" alt="dashboard1" src="https://github.com/user-attachments/assets/3cd4ac98-7993-411a-8c05-2fd212a97dfd" />
+### How it works
+
+```text
+iPhone ──(HTTP POST /location)──▶ local Python server ──(reverse geocode)──▶ browser
+   GPS coordinates                stores latest in memory                fullscreen area
+```
+
+- **Server** keeps only the latest fix in memory and resolves it to a
+  human-readable area with OpenStreetMap Nominatim. Nothing is persisted.
+- **Display** polls `GET /latest` once a second and updates the text in place.
 
 ## Setup
 
-1. Start the server from this folder:
+### 1. Start the server on your computer
 
-   ```bash
-   python3 server.py      # Mac/Linux
-   py server.py           # Windows
-   ```
+```bash
+python3 server.py      # Mac/Linux
+py server.py           # Windows
+```
 
-2. Open the dashboard in your browser:
+It listens on port `3000` and binds to all interfaces so your phone can reach
+it. Note this computer's LAN IP address (e.g. `192.168.1.42`):
 
-   ```text
-   http://127.0.0.1:5173/
-   ```
+```bash
+ipconfig getifaddr en0     # Mac
+hostname -I                # Linux
+ipconfig                   # Windows (look for IPv4 Address)
+```
 
-3. Click the ✎ (edit) button in the top-right. The settings panel walks you
-   through connecting your Outlook calendar, and also lets you
-   set your city and pick a background.
+### 2. Open the display
 
-Press `F11` (or the fullscreen button, top-right) for a clean display.
+On the computer, open:
 
-<img width="2717" height="1563" alt="dashboard2" src="https://github.com/user-attachments/assets/a0fc785b-f6c8-413a-a264-0f8b8c1d3113" />
+```text
+http://127.0.0.1:3000/
+```
 
+Press `F11` (or the fullscreen button, top-right) for a clean display. Until
+the first location arrives it shows **Waiting for location…**.
 
-## Run it in the background (Optional - for Windows only)
+### 3. Build the iPhone Shortcut
 
-So the dashboard keeps running after you close the terminal and starts itself
+In the **Shortcuts** app, create a shortcut with these actions:
+
+1. **Get Current Location**
+2. **Get Latitude** from *Current Location* (Get Details of Location)
+3. **Get Longitude** from *Current Location*
+4. **Get Contents of URL**
+   - URL: `http://YOUR_COMPUTER_IP:3000/location`  ← use the IP from step 1
+   - Method: **POST**
+   - Request Body: **JSON**
+     - `latitude` (Number) → *Latitude*
+     - `longitude` (Number) → *Longitude*
+
+Run it once manually to confirm the display updates.
+
+> **Note on continuous updates:** iOS can't reliably run a Shortcut every few
+> seconds in the background — that's a platform limitation. Trigger it manually,
+> or via a Personal Automation (opening an app, a time of day, a Focus change).
+> Each run refreshes the display within a second or two.
+
+## API
+
+| Method | Path        | Body / Response |
+| ------ | ----------- | --------------- |
+| `POST` | `/location` | `{ "latitude": 43.0481, "longitude": -76.1474, "timestamp": 1783441110 }` → `{ "success": true }` |
+| `GET`  | `/latest`   | `{ "latitude": 43.0481, "longitude": -76.1474, "area": "Syracuse University", "timestamp": 1783441110 }` |
+
+`timestamp` is optional on POST — the server stamps the arrival time if it's
+omitted. If reverse geocoding fails, `area` falls back to the coordinates.
+
+## Run it in the background (Optional — Windows only)
+
+So the server keeps running after you close the terminal and starts itself
 when you log in:
 
 ```powershell
@@ -44,8 +91,6 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 
 This registers a Scheduled Task that runs the server windowlessly with
 `pythonw`, restarts it if it ever stops, and launches it at every log on.
-Then make a browser shortcut to `http://127.0.0.1:5173/` (or open it with
-`--kiosk` for a dedicated display).
 
 To remove it:
 
@@ -55,9 +100,8 @@ powershell -ExecutionPolicy Bypass -File scripts\uninstall-windows.ps1
 
 ## Notes
 
-- Use Windows PowerToys to lock this tab on your secondary display
-- Your settings are saved privately to `config.json`.
-- Outlook regenerates published calendar feeds on its own schedule, so a
-  brand-new event can take a while to appear.
-- If nothing shows up, check `http://127.0.0.1:5173/api/events` to see the raw
-  data or error.
+- Intended for a **trusted local network** — there's no authentication or HTTPS.
+- Reverse geocoding uses the public Nominatim service; the server only calls it
+  when your position actually changes, staying within its usage policy.
+- Set a custom port with the `PORT` environment variable.
+- Use Windows PowerToys (or your OS) to keep the tab on a secondary display.
