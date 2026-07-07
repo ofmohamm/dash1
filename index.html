@@ -268,29 +268,20 @@
     }
     let userName = loadName();
 
-    // The comedy. One of these is picked per place and kept until you move,
-    // so it reads like "Omar is eating ice cream at Syracuse University".
+    // One of these is picked per place and kept until you move, so it reads
+    // like "Omar is managing the jobsite at 123 Main St, Liverpool NY".
     const ACTIVITIES = [
-      "wandering about",
-      "eating ice cream",
-      "taking a nap",
-      "sipping coffee",
-      "pretending to work",
-      "plotting world domination",
-      "touching grass",
-      "living their best life",
-      "definitely not lost",
-      "avoiding responsibilities",
-      "causing a scene",
-      "up to something",
-      "on an adventure",
-      "vibing",
-      "getting snacks",
-      "hiding from emails",
-      "doing very important things",
-      "lurking",
-      "recharging",
-      "making questionable decisions"
+      "doing important work",
+      "on a critical mission",
+      "holding an important meeting",
+      "solving a hard problem",
+      "managing the jobsite",
+      "keeping the job on track",
+      "coordinating the crew",
+      "meeting with the client",
+      "running the site meeting",
+      "getting things done",
+      "delivering results"
     ];
 
     function randomActivity(previous) {
@@ -393,12 +384,6 @@
         }
         setPhrase(`${who} is ${phraseState.activity} at`);
         swapArea(latest.area, false);
-      } else if (latest.received) {
-        // A fix arrived but hasn't resolved to an area yet (geocoding pending
-        // or briefly unavailable). Never reveal coordinates as a stand-in.
-        phraseState.area = null;
-        setPhrase("");
-        swapArea(`Pinning down ${who}…`, true);
       } else {
         phraseState.area = null;
         setPhrase("");
