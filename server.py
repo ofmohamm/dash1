@@ -166,26 +166,58 @@ def parse_coordinate(value: object, name: str) -> float:
     return number
 
 
-def update_location(body: dict) -> dict:
-    """Validate an incoming fix, geocode it, and replace the stored location."""
-    latitude = parse_coordinate(body.get("latitude"), "latitude")
-    longitude = parse_coordinate(body.get("longitude"), "longitude")
-    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-        raise ValueError("Coordinates are out of range.")
+# Field names the Shortcut may use to send an already-named place as text
+# (Apple resolves it on-device). First non-empty string wins.
+TEXT_AREA_KEYS = ("area", "location", "address", "place")
 
+
+def extract_text_area(body: dict) -> str | None:
+    """Return a place name the client sent as text, or None if it sent none."""
+    for key in TEXT_AREA_KEYS:
+        value = body.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:120]
+    return None
+
+
+def update_location(body: dict) -> dict:
+    """Store an incoming fix and replace the displayed location.
+
+    Two ways to say where you are, checked in this order:
+      1. A text place name (e.g. "area": "Wrentham Drive, Liverpool, NY") that
+         the phone already resolved with Apple Maps. Used as-is, no geocoding.
+      2. "latitude"/"longitude", which the server reverse-geocodes itself.
+    Coordinates may accompany a text area; they are stored but not displayed.
+    """
     timestamp = body.get("timestamp")
     if not isinstance(timestamp, (int, float)):
         timestamp = int(time_module.time())
 
-    # Geocode outside the lock: a slow Nominatim call shouldn't block /latest
-    # readers. The store itself is swapped atomically under the lock.
-    area = area_for(latitude, longitude)
+    latitude = longitude = None
+    if body.get("latitude") is not None or body.get("longitude") is not None:
+        latitude = parse_coordinate(body.get("latitude"), "latitude")
+        longitude = parse_coordinate(body.get("longitude"), "longitude")
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            raise ValueError("Coordinates are out of range.")
+
+    text_area = extract_text_area(body)
+    if text_area is not None:
+        # Trust the phone's own naming; skip geocoding entirely.
+        area = text_area
+    elif latitude is not None:
+        # Geocode outside the lock: a slow Nominatim call shouldn't block
+        # /latest readers. The store is swapped atomically under the lock.
+        area = area_for(latitude, longitude)
+    else:
+        raise ValueError(
+            "Send an 'area' text field, or 'latitude' and 'longitude'."
+        )
 
     with state_lock:
-        # If this fix couldn't be resolved to an area, keep the last known one
-        # rather than blanking the display, since POSTs are infrequent (iOS can't
-        # run the Shortcut continuously), so the old area is the best guess
-        # until the next successful lookup.
+        # If a coordinate fix couldn't be resolved to an area, keep the last
+        # known one rather than blanking the display, since POSTs are infrequent
+        # (iOS can't run the Shortcut continuously), so the old area is the best
+        # guess until the next successful lookup.
         if area is None:
             area = state.get("area")
         state.update(

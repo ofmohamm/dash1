@@ -102,6 +102,10 @@ example 7am to midnight) to use about half that.
 This is the part that sends your location. You build it once in the
 **Shortcuts** app (already on every iPhone).
 
+The recommended way sends the **place name your iPhone already resolved** (using
+Apple Maps, on-device), which is usually a better label than the server can look
+up and needs no internet geocoding on the server side.
+
 1. Open **Shortcuts**, tap **+** (top right) to create a new shortcut.
 2. Tap **Add Action** and add these actions **in order**. Search for each one
    by name:
@@ -109,21 +113,14 @@ This is the part that sends your location. You build it once in the
    | # | Action | What to set |
    |---|--------|-------------|
    | 1 | **Get Current Location** | nothing to change |
-   | 2 | **Get Details of Location** | choose **Latitude**, input = *Current Location* |
-   | 3 | **Get Details of Location** | choose **Longitude**, input = *Current Location* |
-   | 4 | **Get Contents of URL** | see below |
+   | 2 | **Get Details of Location** | choose **Name**, input = *Current Location* |
+   | 3 | **Get Contents of URL** | see below |
 
-   > **Important:** both **Get Details of Location** actions must take **Current
-   > Location** as their input. Shortcuts often auto-fills the second one with
-   > the previous action's result (the Latitude number), which causes the error
-   > **"could not convert from text to location."** If you see that, tap the
-   > input on each Get Details of Location action and set it back to the
-   > **Current Location** variable so neither one points at the other.
-   >
-   > **Simpler alternative that avoids the error entirely:** delete both Get
-   > Details of Location actions and, in the JSON body below, insert the
-   > **Current Location** variable into each value, then tap it and pick the
-   > **Latitude** or **Longitude** property directly.
+   > **Want a fuller "Street, Town, ST" label?** Add extra **Get Details of
+   > Location** actions for **City** and **State** (each with input = *Current
+   > Location*), then a **Text** action that combines them, for example
+   > `Name, City, State`, and send that Text instead of just the Name in the
+   > next step.
 
 3. Tap the **Get Contents of URL** action and set it up:
    - **URL:** your server URL followed by `/location`, for example
@@ -132,20 +129,23 @@ This is the part that sends your location. You build it once in the
    - Under **Headers**, tap **Add new header**:
      - Key: `X-Token`
      - Value: your secret from Step 2
-   - Set **Request Body** to **JSON** and add two fields (tap **Add new field**,
-     choose **Number** for each):
+   - Set **Request Body** to **JSON** and add one field (tap **Add new field**,
+     choose **Text**):
 
      | Key | Value |
      |------|-------|
-     | `latitude`  | the **Latitude** from action 2 |
-     | `longitude` | the **Longitude** from action 3 |
-
-     > Tip: tap the value box and pick the blue **Latitude** / **Longitude**
-     > variables that came from the earlier actions.
+     | `area` | the **Name** from action 2 (or your combined Text) |
 
 4. Name the shortcut (for example **Send My Location**) and tap **Done**.
 5. **Test it:** tap the shortcut to run it. The first time, your iPhone asks for
    permission to use your location. Tap **Allow**.
+
+> **Prefer to let the server do the naming?** You can instead send coordinates
+> and let the server reverse-geocode them. Send two **Number** fields,
+> `latitude` and `longitude` (from **Get Details of Location** -> Latitude /
+> Longitude), and leave out `area`. Make sure each Get Details of Location action
+> takes **Current Location** as its input; if the second one grabs the previous
+> action's number instead, you get "could not convert from text to location."
 
 ## Step 4: Open the display
 
@@ -247,16 +247,17 @@ without a dedicated app, and it uses battery, so keep that phone charging.
 ## For the curious: how it works inside
 
 ```text
-iPhone  --HTTPS POST /location-->  Python server  --reverse geocode-->  Browser
-  GPS coordinates                  keeps only the latest fix           fullscreen area name
-                                   in memory; resolves to a place
+iPhone  --HTTPS POST /location-->  Python server  ---------------------->  Browser
+  place name, or coordinates       keeps only the latest fix in memory   fullscreen area name
+                                   (reverse-geocodes coordinates itself)
 ```
 
 - The server (`server.py`) is plain Python with no frameworks and no database.
   It stores just the most recent location in memory, so a restart forgets it.
-- It turns coordinates into a place name using the free
-  [OpenStreetMap Nominatim](https://nominatim.org/) service, and only calls it
-  when your position actually changes.
+- If the phone sends a text place name, the server displays it as-is. If it
+  sends coordinates instead, the server turns them into a name using the free
+  [OpenStreetMap Nominatim](https://nominatim.org/) service, only when your
+  position actually changes.
 - The page (`index.html`) asks the server for the latest area once a second and
   updates the text. Coordinates are never sent to the browser.
 
@@ -264,8 +265,8 @@ iPhone  --HTTPS POST /location-->  Python server  --reverse geocode-->  Browser
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `POST` | `/location` | Phone sends `{ "latitude": ..., "longitude": ... }` |
-| `GET`  | `/latest`   | Page reads `{ "area": "Syracuse University", "timestamp": ... }` |
+| `POST` | `/location` | Phone sends `{ "area": "Wrentham Drive, Liverpool, NY" }` or `{ "latitude": ..., "longitude": ... }` |
+| `GET`  | `/latest`   | Page reads `{ "area": "Wrentham Drive, Liverpool, NY", "timestamp": ... }` |
 | `GET`  | `/healthz`  | Keep-alive check, returns `{ "ok": true }`, no token needed |
 
 ### The secret token
