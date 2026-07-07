@@ -23,24 +23,21 @@ In the **Shortcuts** app, tap **+** and add these actions:
 
 1. **Get Current Location**
 2. **Text** action, and insert the **Current Location** variable into it. A
-   location placed in a Text action turns into its full street address. (Putting
-   the location straight into the JSON field below does not reliably become text,
-   so it fails or sends coordinates. This Text step is what makes it work.)
+   location placed in a Text action turns into its full street address.
 3. **Get Contents of URL**
    - **URL:** your server URL followed by `/location`, for example
      `https://your-service.onrender.com/location`
    - Tap **Show More**, set **Method** to **POST**.
    - Under **Headers**, add one: key `X-Token`, value your secret from step 1.
-   - Set **Request Body** to **JSON** and add one **Text** field:
-     - key `area`, value the **Text** from step 2.
+   - Set **Request Body** to **Text**, and set the body to the **Text** from
+     step 2.
 
 Name it (for example **Send My Location**), tap **Done**, run it once, and tap
 **Allow** for location access.
 
-> If the address looks wrong or shows coordinates, swap step 2 for a **Get
-> Details of Location** action set to **Name** (input = *Current Location*), and
-> send that as `area` instead. That gives a shorter label like the street or
-> place name.
+> Send the address as a plain **Text** body, not JSON. The address Apple
+> produces is multi-line, and the Shortcuts JSON builder mangles multi-line text
+> into an invalid body that the server cannot read. A plain Text body just works.
 
 ## 3. Open the display
 

@@ -40,12 +40,19 @@ state: dict = {"area": None, "timestamp": None}
 TEXT_AREA_KEYS = ("area", "location", "address", "place")
 
 
+def normalize_area(value: str) -> str:
+    """Tidy a place name into one line: collapse the multi-line address Apple
+    produces into a comma-separated string, and cap the length."""
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    return ", ".join(lines)[:120]
+
+
 def extract_text_area(body: dict) -> str | None:
     """Return the place name the client sent, or None if it sent none."""
     for key in TEXT_AREA_KEYS:
         value = body.get(key)
         if isinstance(value, str) and value.strip():
-            return value.strip()[:120]
+            return normalize_area(value)
     return None
 
 
@@ -122,16 +129,29 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            body = json.loads(self.rfile.read(length).decode("utf-8"))
-            if not isinstance(body, dict):
-                raise ValueError("Expected a JSON object.")
+            raw = self.rfile.read(length).decode("utf-8", errors="replace")
+
+            # Accept either JSON (e.g. {"area": "..."}) or a plain-text body
+            # that is the location itself. The plain-text path avoids Shortcuts'
+            # JSON builder mangling multi-line addresses.
+            body: dict | None = None
+            try:
+                decoded = json.loads(raw)
+                if isinstance(decoded, dict):
+                    body = decoded
+                elif isinstance(decoded, str) and decoded.strip():
+                    body = {"area": decoded}
+            except (ValueError, TypeError):
+                body = None
+
             if not authorized(self.headers, parsed.query, body):
                 self.send_json(
                     {"success": False, "message": "Unauthorized."},
                     status=HTTPStatus.UNAUTHORIZED,
                 )
                 return
-            update_location(body)
+
+            update_location(body if body is not None else {"area": raw})
             self.send_json({"success": True})
         except Exception as error:
             self.send_json(
