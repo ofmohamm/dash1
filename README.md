@@ -113,6 +113,18 @@ This is the part that sends your location. You build it once in the
    | 3 | **Get Details of Location** | choose **Longitude**, input = *Current Location* |
    | 4 | **Get Contents of URL** | see below |
 
+   > **Important:** both **Get Details of Location** actions must take **Current
+   > Location** as their input. Shortcuts often auto-fills the second one with
+   > the previous action's result (the Latitude number), which causes the error
+   > **"could not convert from text to location."** If you see that, tap the
+   > input on each Get Details of Location action and set it back to the
+   > **Current Location** variable so neither one points at the other.
+   >
+   > **Simpler alternative that avoids the error entirely:** delete both Get
+   > Details of Location actions and, in the JSON body below, insert the
+   > **Current Location** variable into each value, then tap it and pick the
+   > **Latitude** or **Longitude** property directly.
+
 3. Tap the **Get Contents of URL** action and set it up:
    - **URL:** your server URL followed by `/location`, for example
      `https://your-service.onrender.com/location`
