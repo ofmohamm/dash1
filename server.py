@@ -59,12 +59,28 @@ MIN_MOVE_DEGREES = 0.0003
 _geocode_cache: dict = {"latitude": None, "longitude": None, "area": None}
 
 
-def reverse_geocode(latitude: float, longitude: float) -> str | None:
-    """Resolve coordinates to a short area name, or None if it can't.
+# Address keys that name the town/city you're in, best first. We add one of
+# these after the specific spot so the label reads "<place>, <town>".
+SETTLEMENT_KEYS = (
+    "city",
+    "town",
+    "village",
+    "hamlet",
+    "municipality",
+    "suburb",
+    "neighbourhood",
+    "city_district",
+    "county",
+)
 
-    Prefers the most specific meaningful label Nominatim offers (a named
-    place, then neighbourhood, suburb, city district, etc.) so the display
-    reads like "Syracuse University" rather than a full postal address.
+
+def reverse_geocode(latitude: float, longitude: float) -> str | None:
+    """Resolve coordinates to a friendly area label, or None if it can't.
+
+    Builds up to three parts, most specific first, so the display reads like
+    "Wrentham Drive, Liverpool, NY" or "Syracuse University, Syracuse, NY":
+    the named spot (a place or the street), then the town/city, then the state.
+    Duplicates are dropped, so a bare town just reads "Liverpool, NY".
     """
     query = urllib.parse.urlencode(
         {
@@ -85,26 +101,32 @@ def reverse_geocode(latitude: float, longitude: float) -> str | None:
     except Exception:
         return None
 
-    if data.get("name"):
-        return str(data["name"])
-
     address = data.get("address") or {}
-    for key in (
-        "neighbourhood",
-        "suburb",
-        "quarter",
-        "city_district",
-        "hamlet",
-        "village",
-        "town",
-        "city",
-        "municipality",
-        "county",
-        "state",
-    ):
-        if address.get(key):
-            return str(address[key])
+    parts: list[str] = []
 
+    def add(value: object) -> None:
+        text = str(value).strip() if value else ""
+        if text and text not in parts:
+            parts.append(text)
+
+    # The specific spot: a named place (e.g. a university) or the street.
+    add(data.get("name") or address.get("road"))
+
+    # The town/city you're in (just one level of it).
+    for key in SETTLEMENT_KEYS:
+        if address.get(key):
+            add(address[key])
+            break
+
+    # The state, as a short code when available ("US-NY" -> "NY").
+    iso = address.get("ISO3166-2-lvl4", "")
+    if isinstance(iso, str) and "-" in iso:
+        add(iso.split("-")[-1])
+    else:
+        add(address.get("state"))
+
+    if parts:
+        return ", ".join(parts)
     return data.get("display_name") or None
 
 

@@ -172,24 +172,48 @@ That is the whole thing working from anywhere.
 
 ---
 
-## Making it update automatically (optional)
+## Keeping it updated
 
-iPhones **cannot** run a shortcut every few seconds in the background. That is
-an Apple limitation, not something this project can change. Instead you can
-trigger the shortcut automatically at sensible moments:
+**The honest limitation:** iOS does not let a Shortcut run continuously or on a
+short timer in the background. Apple suspends background shortcuts within about a
+minute, so there is no native "update every few seconds while the phone is in my
+pocket." A truly always-on feed would need a dedicated app, which is out of scope
+here. Two practical options get you most of the way.
+
+### Option 1: Event-based automations (hands-off, occasional)
+
+Trigger the shortcut automatically when something happens:
 
 1. In **Shortcuts**, open the **Automation** tab, tap **+**, then **Create
    Personal Automation**.
-2. Pick a trigger, for example:
-   - **Time of Day**, such as every hour.
-   - **When I open an app**, to update whenever you open a chosen app.
-   - **Focus**, when you turn Work or Personal Focus on or off.
-3. For the action, choose **Run Shortcut** and select your **Send My Location**
-   shortcut.
+2. Pick a trigger. Good ones for location:
+   - **Arrive** or **Leave** a place, so it updates whenever you come and go.
+   - **CarPlay** or **Bluetooth** connects, to catch when you are driving.
+   - **When I open an app**, to update whenever you open something you use often.
+   - **Focus** change, or **Time of Day** (note this one is daily).
+3. Set the action to **Run Shortcut** and choose **Send My Location**.
 4. Turn **off** "Ask Before Running" so it runs quietly.
 
-Each time it fires, the display refreshes. For a truly live view, just run the
-shortcut by hand whenever you want to update it.
+These do not fire every minute, but between arrive/leave and app-open triggers
+the display usually stays current enough for "where are they right now."
+
+### Option 2: A foreground loop (genuinely continuous, phone dedicated)
+
+If you want it posting constantly (for example on a spare phone, or while the
+phone sits on a charger), make a looping shortcut and leave it running with the
+Shortcuts app open on screen:
+
+1. Make a copy of your shortcut.
+2. Wrap the actions in a **Repeat** block (say 1000 times):
+   - **Get Current Location**
+   - **Get Contents of URL** (the POST, exactly as in Step 3)
+   - **Wait** 30 seconds
+3. Run it and leave the Shortcuts app in the foreground. It keeps posting every
+   30 seconds.
+
+This only runs while the app is open and the phone is unlocked; iOS pauses it the
+moment you lock the phone or switch away. It is the closest thing to "always on"
+without a dedicated app, and it uses battery, so keep that phone charging.
 
 ---
 
