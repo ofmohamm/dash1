@@ -1,0 +1,21 @@
+# Render Blueprint for one-step deploy.
+#
+# In the Render dashboard: New + -> Blueprint -> connect this repo. Render reads
+# this file and creates a free web service. You will be asked to fill in SECRET:
+# paste a long random string (your token). After it deploys you get an HTTPS URL
+# like https://your-service.onrender.com.
+#
+# The server needs no third-party packages (standard-library Python only), so
+# requirements.txt is intentionally empty.
+services:
+  - type: web
+    name: iphone-location-display
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: SECRET
+        sync: false

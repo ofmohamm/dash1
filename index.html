@@ -161,6 +161,17 @@
       collapseIcon: document.getElementById("collapseIcon")
     };
 
+    // When the server runs behind a secret (a public web host), this page is
+    // opened as .../?token=YOURSECRET. Read that token and send it with every
+    // request. A #token=... hash works too, in case you'd rather it not sit in
+    // the query string. On a home LAN with no secret set, this is just empty.
+    const TOKEN = (() => {
+      const fromQuery = new URLSearchParams(location.search).get("token");
+      if (fromQuery) return fromQuery;
+      const hash = location.hash;
+      return hash.startsWith("#token=") ? decodeURIComponent(hash.slice(7)) : "";
+    })();
+
     // Last values we rendered, so we only touch the DOM (and trigger the
     // cross-fade) when something actually changed.
     const shown = { area: null, timestamp: null };
@@ -191,8 +202,9 @@
     // Cache the latest fix so the "updated N seconds ago" line keeps ticking
     // between polls. We track whether a fix has arrived (received) separately
     // from whether it resolved to an area, so we never fall back to showing
-    // raw coordinates — the display only ever names an area.
-    const latest = { area: null, received: false, timestamp: null };
+    // raw coordinates: the display only ever names an area. authError is set
+    // when the server rejects our token.
+    const latest = { area: null, received: false, timestamp: null, authError: false };
 
     function renderUpdated() {
       if (latest.timestamp == null) {
@@ -203,11 +215,18 @@
       const seconds = Math.max(0, Date.now() / 1000 - latest.timestamp);
       els.updated.textContent = relativeTime(seconds);
       // A fix older than a couple of minutes means the Shortcut hasn't run
-      // recently — warm the note so it's obvious the position may be stale.
+      // recently, so warm the note to show the position may be stale.
       els.updated.classList.toggle("stale", seconds > 120);
     }
 
     function render() {
+      if (latest.authError) {
+        // The server has a secret set and we don't have the right token.
+        swapArea("Locked", true);
+        els.updated.textContent = "Open this page with ?token=YOUR_SECRET";
+        els.updated.classList.remove("stale");
+        return;
+      }
       if (latest.area) {
         swapArea(latest.area, false);
       } else if (latest.received) {
@@ -222,9 +241,20 @@
 
     async function poll() {
       try {
-        const res = await fetch("/latest", { cache: "no-store" });
+        // Send the token as a header so it stays out of the request URL (and
+        // any server access log). Empty when there's no secret.
+        const res = await fetch("/latest", {
+          cache: "no-store",
+          headers: TOKEN ? { "X-Token": TOKEN } : {}
+        });
+        if (res.status === 401) {
+          latest.authError = true;
+          render();
+          return;
+        }
         if (!res.ok) throw new Error();
         const data = await res.json();
+        latest.authError = false;
         latest.area = data.area || null;
         latest.received = typeof data.timestamp === "number";
         latest.timestamp = typeof data.timestamp === "number" ? data.timestamp : null;

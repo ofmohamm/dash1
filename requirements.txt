@@ -1,0 +1,2 @@
+# No third-party dependencies: the server uses only the Python standard library.
+# This file exists so hosting platforms detect a Python app and run a build step.
