@@ -46,13 +46,16 @@
     .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 0.6rem;
+      justify-content: center;
+      gap: 0.55rem;
+      max-width: min(90vw, 48rem);
       color: var(--muted);
-      font-size: clamp(0.85rem, 1.6vw, 1.15rem);
-      font-weight: 650;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
+      font-size: clamp(1rem, 2.1vw, 1.7rem);
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
+
+    .eyebrow.hidden { display: none; }
 
     .pin {
       width: 1.1em;
@@ -124,17 +127,86 @@
       opacity: 0;
       pointer-events: none;
     }
+
+    /* Ask-for-your-name overlay */
+    .name-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+
+    .name-backdrop.open { display: grid; }
+
+    .name-card {
+      width: min(90vw, 24rem);
+      padding: 1.9rem;
+      border-radius: 1.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(12, 14, 18, 0.94);
+      box-shadow: 0 2rem 7rem rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+
+    .name-card h2 {
+      margin: 0 0 0.4rem;
+      font-size: 1.45rem;
+      letter-spacing: -0.02em;
+    }
+
+    .name-card p {
+      margin: 0 0 1.2rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .name-card input {
+      width: 100%;
+      padding: 0.72rem 0.9rem;
+      border-radius: 0.8rem;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font: inherit;
+      font-size: 1.05rem;
+      text-align: center;
+    }
+
+    .name-card input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .name-card button {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      border: none;
+      background: var(--accent);
+      color: #0b1020;
+      font: inherit;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .name-card button:hover { background: #a3b4ff; }
   </style>
 </head>
 <body>
   <main class="stage">
     <section class="location" aria-live="polite">
-      <div class="eyebrow">
+      <div class="eyebrow hidden" id="eyebrow">
         <svg class="pin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z" stroke="currentColor" stroke-width="1.7"/>
           <circle cx="12" cy="11" r="2.1" stroke="currentColor" stroke-width="1.7"/>
         </svg>
-        Current Area
+        <span id="phrase"></span>
       </div>
       <div class="area waiting" id="area">Waiting for location…</div>
       <div class="updated" id="updated"></div>
@@ -142,6 +214,12 @@
   </main>
 
   <div class="controls">
+    <button class="icon-btn" id="nameBtn" type="button" title="Change name" aria-label="Change name">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
     <button class="icon-btn" id="fullscreenBtn" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
       <svg id="expandIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -152,14 +230,79 @@
     </button>
   </div>
 
+  <div class="name-backdrop" id="nameBackdrop">
+    <form class="name-card" id="nameForm">
+      <h2>Who are we tracking?</h2>
+      <p>Pop in a name and the display will keep tabs on them.</p>
+      <input type="text" id="nameInput" placeholder="e.g. Omar" spellcheck="false" autocomplete="off" maxlength="24" />
+      <button type="submit">Start tracking</button>
+    </form>
+  </div>
+
   <script>
     const els = {
       area: document.getElementById("area"),
       updated: document.getElementById("updated"),
+      eyebrow: document.getElementById("eyebrow"),
+      phrase: document.getElementById("phrase"),
       fullscreenBtn: document.getElementById("fullscreenBtn"),
       expandIcon: document.getElementById("expandIcon"),
-      collapseIcon: document.getElementById("collapseIcon")
+      collapseIcon: document.getElementById("collapseIcon"),
+      nameBtn: document.getElementById("nameBtn"),
+      nameBackdrop: document.getElementById("nameBackdrop"),
+      nameForm: document.getElementById("nameForm"),
+      nameInput: document.getElementById("nameInput")
     };
+
+    // Whose location this is. Remembered in the browser so you only enter it
+    // once; ?name=Omar in the URL sets it too. Empty until you pick one.
+    const NAME_KEY = "locationDisplayName";
+    function loadName() {
+      const fromUrl = new URLSearchParams(location.search).get("name");
+      if (fromUrl) {
+        localStorage.setItem(NAME_KEY, fromUrl);
+        return fromUrl;
+      }
+      return localStorage.getItem(NAME_KEY) || "";
+    }
+    let userName = loadName();
+
+    // The comedy. One of these is picked per place and kept until you move,
+    // so it reads like "Omar is eating ice cream at Syracuse University".
+    const ACTIVITIES = [
+      "wandering about",
+      "eating ice cream",
+      "taking a nap",
+      "sipping coffee",
+      "pretending to work",
+      "plotting world domination",
+      "touching grass",
+      "living their best life",
+      "definitely not lost",
+      "avoiding responsibilities",
+      "causing a scene",
+      "up to something",
+      "on an adventure",
+      "vibing",
+      "getting snacks",
+      "hiding from emails",
+      "doing very important things",
+      "lurking",
+      "recharging",
+      "making questionable decisions"
+    ];
+
+    function randomActivity(previous) {
+      let pick;
+      do {
+        pick = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)];
+      } while (ACTIVITIES.length > 1 && pick === previous);
+      return pick;
+    }
+
+    // Keep the current quip stable while at the same place; roll a new one each
+    // time the area changes.
+    const phraseState = { area: null, activity: null };
 
     // When the server runs behind a secret (a public web host), this page is
     // opened as .../?token=YOURSECRET. Read that token and send it with every
@@ -219,22 +362,46 @@
       els.updated.classList.toggle("stale", seconds > 120);
     }
 
+    function setPhrase(text) {
+      if (!text) {
+        els.eyebrow.classList.add("hidden");
+        els.phrase.textContent = "";
+        return;
+      }
+      els.phrase.textContent = text;
+      els.eyebrow.classList.remove("hidden");
+    }
+
     function render() {
+      const who = userName || "Someone";
+
       if (latest.authError) {
         // The server has a secret set and we don't have the right token.
+        setPhrase("");
         swapArea("Locked", true);
         els.updated.textContent = "Open this page with ?token=YOUR_SECRET";
         els.updated.classList.remove("stale");
         return;
       }
       if (latest.area) {
+        // Roll a fresh quip whenever the place changes; keep it otherwise, so
+        // it reads like "Omar is eating ice cream at Syracuse University".
+        if (phraseState.area !== latest.area) {
+          phraseState.area = latest.area;
+          phraseState.activity = randomActivity(phraseState.activity);
+        }
+        setPhrase(`${who} is ${phraseState.activity} at`);
         swapArea(latest.area, false);
       } else if (latest.received) {
         // A fix arrived but hasn't resolved to an area yet (geocoding pending
         // or briefly unavailable). Never reveal coordinates as a stand-in.
-        swapArea("Finding area…", true);
+        phraseState.area = null;
+        setPhrase("");
+        swapArea(`Pinning down ${who}…`, true);
       } else {
-        swapArea("Waiting for location…", true);
+        phraseState.area = null;
+        setPhrase("");
+        swapArea(`Looking for ${who}…`, true);
       }
       renderUpdated();
     }
@@ -282,6 +449,44 @@
       els.collapseIcon.style.display = fs ? "" : "none";
     }
 
+    /* ---------- Name overlay ---------- */
+
+    function openNamePrompt() {
+      els.nameInput.value = userName;
+      els.nameBackdrop.classList.add("open");
+      els.nameInput.focus();
+      els.nameInput.select();
+    }
+
+    function closeNamePrompt() {
+      els.nameBackdrop.classList.remove("open");
+    }
+
+    function saveName(event) {
+      event.preventDefault();
+      const value = els.nameInput.value.trim();
+      if (!value) {
+        els.nameInput.focus();
+        return;
+      }
+      userName = value;
+      localStorage.setItem(NAME_KEY, value);
+      // Force the phrase to rebuild with the new name on the next render.
+      phraseState.area = null;
+      closeNamePrompt();
+      render();
+    }
+
+    els.nameForm.addEventListener("submit", saveName);
+    els.nameBtn.addEventListener("click", openNamePrompt);
+    els.nameBackdrop.addEventListener("click", event => {
+      // Click outside the card to dismiss, but only once a name is set.
+      if (event.target === els.nameBackdrop && userName) closeNamePrompt();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && userName) closeNamePrompt();
+    });
+
     els.fullscreenBtn.addEventListener("click", toggleFullscreen);
     document.addEventListener("fullscreenchange", syncFullscreenIcon);
 
@@ -291,6 +496,9 @@
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => document.body.classList.add("hide-ui"), 3000);
     });
+
+    // Ask for a name on first visit; after that it's remembered.
+    if (!userName) openNamePrompt();
 
     render();
     poll();

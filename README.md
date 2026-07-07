@@ -159,11 +159,15 @@ https://your-service.onrender.com/?token=YOUR_SECRET
 
 Replace `YOUR_SECRET` with the token from step A2.
 
-- Before your first location arrives it shows **Waiting for location...**
+- The first time you open it, it asks **"Who are we tracking?"** Enter a name
+  and it is remembered on that computer. The display then narrates with it, like
+  *Omar is eating ice cream at Syracuse University*, picking a new quip each time
+  you move to a new place. Change the name any time with the person button (top
+  right), or preset it by adding `&name=Omar` to the address.
 - If it shows **Locked**, the token in the address is missing or wrong.
 - Run the shortcut on your phone, and within a second or two the screen shows
-  your area.
-- Press **F11** (or click the button, top right) for a clean fullscreen view.
+  the area.
+- Press **F11** (or click the fullscreen button, top right) for a clean view.
 
 That is the whole thing working from anywhere.
 
