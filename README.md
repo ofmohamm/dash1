@@ -159,7 +159,7 @@ https://your-service.onrender.com/?token=YOUR_SECRET
 
 Replace `YOUR_SECRET` with the token from step A2.
 
-- The first time you open it, it asks **"Who are we tracking?"** Enter a name
+- The first time you open it, it asks **"What's your name?"** Enter a name
   and it is remembered on that computer. The display then narrates with it, like
   *Omar is eating ice cream at Syracuse University*, picking a new quip each time
   you move to a new place. Change the name any time with the person button (top
